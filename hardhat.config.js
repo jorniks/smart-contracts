@@ -6,10 +6,10 @@ const { DEPLOYING_WALLET_PRIVATE_KEY, NETWORK_RPC_URL } = process.env;
 
 module.exports = {
   solidity: "0.8.27",
-  defaultNetwork: "sepolia",
+  defaultNetwork: "aiachain",
   networks: {
     hardhat: {},
-    sepolia: {
+    aiachain: {
       url: NETWORK_RPC_URL,
       chainId: 1320,
       accounts: [DEPLOYING_WALLET_PRIVATE_KEY],
