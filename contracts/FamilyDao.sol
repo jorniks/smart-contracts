@@ -100,8 +100,9 @@ contract FamilyDao {
         _;
     }
 
-    constructor() {
-        baseToken = IERC20(0x5900343DD73367fEBC0dB13C6108D54f3d85832d);
+    constructor(address _tokenAddress) {
+        require(_tokenAddress != address(0), "Invalid token address");
+        baseToken = IERC20(_tokenAddress);
     }
 
     function createFamily(string memory _familyName, string memory _creatorName) external returns (address) {
