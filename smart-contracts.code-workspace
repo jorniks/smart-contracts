@@ -1,8 +1,19 @@
 {
 	"folders": [
 		{
-			"path": "family-dao"
-		}
+			"path": "./",
+			"name": "ROOT"
+		},
+		{
+			"path": "./projects/family-dao"
+		},
+		{
+			"path": "."
+		},
 	],
-	"settings": {}
+	"settings": {
+    "files.exclude": {
+      "projects/": true
+    },
+  }
 }
