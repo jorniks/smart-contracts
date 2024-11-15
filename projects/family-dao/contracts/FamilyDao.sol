@@ -149,7 +149,7 @@ contract FamilyDao {
         }
 
         FamilyView[] memory userFamilies = new FamilyView[](userFamilyCount);
-        
+
         uint256 currentIndex = 0;
         for (uint256 i = 0; i < familyCount; i++) {
             if (families[i].members[msg.sender].addr != address(0)) {
@@ -163,10 +163,10 @@ contract FamilyDao {
 
     function getFamilyView(uint256 _familyId) internal view returns (FamilyView memory) {
         Family storage family = families[_familyId];
-        
+
         Member[] memory memberList = getFamilyMembers(_familyId);
         ProposalView[] memory proposalList = getFamilyProposals(_familyId);
-        
+
         return FamilyView({
             familyId: _familyId,
             name: family.name,
@@ -182,19 +182,19 @@ contract FamilyDao {
     function getFamilyMembers(uint256 _familyId) internal view returns (Member[] memory) {
         Family storage family = families[_familyId];
         Member[] memory memberList = new Member[](family.memberAddresses.length);
-        
+
         for (uint256 i = 0; i < family.memberAddresses.length; i++) {
             address memberAddr = family.memberAddresses[i];
             memberList[i] = family.members[memberAddr];
         }
-        
+
         return memberList;
     }
 
     function getFamilyProposals(uint256 _familyId) internal view returns (ProposalView[] memory) {
         Proposal[] storage proposals = familyProposals[_familyId];
         ProposalView[] memory proposalViews = new ProposalView[](proposals.length);
-        
+
         for (uint256 i = 0; i < proposals.length; i++) {
             Proposal storage proposal = proposals[i];
             proposalViews[i] = ProposalView({
@@ -209,7 +209,7 @@ contract FamilyDao {
                 status: proposal.status
             });
         }
-        
+
         return proposalViews;
     }
 
@@ -220,11 +220,11 @@ contract FamilyDao {
     }
 
     function createProposal(
-        uint256 _familyId, 
-        string calldata _title, 
-        string calldata _description, 
-        uint256 _amount, 
-        address _recipient, 
+        uint256 _familyId,
+        string calldata _title,
+        string calldata _description,
+        uint256 _amount,
+        address _recipient,
         uint256 _duration
     ) external familyExists(_familyId) onlyMembers(_familyId) {
         Proposal storage newProposal = familyProposals[_familyId].push();
@@ -275,11 +275,11 @@ contract FamilyDao {
         Proposal storage proposal = familyProposals[_familyId][_proposalId];
 
         require(bytes(proposal.status).length == 0 || keccak256(bytes(proposal.status)) != keccak256(bytes("withdrawn")), "Funds already withdrawn!");
-        
-        bool canClaim = (block.timestamp >= proposal.endDate && 
+
+        bool canClaim = (block.timestamp >= proposal.endDate &&
             bytes(proposal.status).length > 0 && keccak256(bytes(proposal.status)) == keccak256(bytes("pending"))) ||
             (bytes(proposal.status).length > 0 && keccak256(bytes(proposal.status)) == keccak256(bytes("approved")));
-            
+
         require(canClaim, "Cannot withdraw funds yet");
 
         if (bytes(proposal.status).length > 0 && keccak256(bytes(proposal.status)) == keccak256(bytes("pending"))) {
@@ -319,7 +319,7 @@ contract FamilyDao {
       Family storage family = families[_familyId];
       require(family.members[_member].addr != address(0), "Member does not exist");
       require(_member != msg.sender, "You cannot remove yourself");
-      
+
       // Remove member from mapping
       delete family.members[_member];
 
