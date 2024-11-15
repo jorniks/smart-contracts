@@ -8,6 +8,9 @@
 			"path": "./projects/family-dao"
 		},
 		{
+			"path": "./projects/fund-raiser"
+		},
+		{
 			"path": "."
 		},
 	],
