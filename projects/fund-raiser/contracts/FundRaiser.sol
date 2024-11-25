@@ -8,13 +8,14 @@ import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
 
-  struct Proposal {
+  struct Campaign {
     uint256 id;
     string title;
     string description;
     string imageLink;
     uint256 goal;
     uint256 endDate;
+    uint256 createdAt;
     address creator;
     address preferredToken;
     uint256 totalRaised;
@@ -29,13 +30,14 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     uint256 timestamp;
   }
 
-  struct ProposalWithContributions {
+  struct CampaignWithContributions {
     uint256 id;
     string title;
     string description;
     string imageLink;
     uint256 goal;
     uint256 endDate;
+    uint256 createdAt;
     address creator;
     address preferredToken;
     uint256 totalRaised;
@@ -44,28 +46,28 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     Contribution[] contributions;
   }
 
-  uint256 private proposalCounter;
+  uint256 private campaignCounter;
   uint256 public platformFee; // in basis points (1% = 100)
 
-  mapping(uint256 => Proposal) public proposals;
-  mapping(uint256 => Contribution[]) public proposalContributions;
-  mapping(address => uint256[]) public userProposals;
+  mapping(uint256 => Campaign) public campaigns;
+  mapping(uint256 => Contribution[]) public campaignContributions;
+  mapping(address => uint256[]) public userCampaigns;
 
-  event ProposalCreated(uint256 indexed proposalId, address indexed creator, uint256 goal);
-  event ContributionMade(uint256 indexed proposalId, address indexed contributor, uint256 amount);
-  event ProposalCancelled(uint256 indexed proposalId);
-  event FundsClaimed(uint256 indexed proposalId, uint256 amount);
-  event ContributionWithdrawn(uint256 indexed proposalId, address indexed contributor, uint256 amount);
+  event CampaignCreated(uint256 indexed campaignId, address indexed creator, uint256 goal);
+  event ContributionMade(uint256 indexed campaignId, address indexed contributor, uint256 amount);
+  event CampaignCancelled(uint256 indexed campaignId);
+  event FundsClaimed(uint256 indexed campaignId, uint256 amount);
+  event ContributionWithdrawn(uint256 indexed campaignId, address indexed contributor, uint256 amount);
   event PlatformFeeUpdated(uint256 newFee);
 
-  modifier onlyProposalCreator(uint256 _proposalId) {
-    require(proposals[_proposalId].creator == msg.sender, "Not proposal creator");
+  modifier onlyCampaignCreator(uint256 _campaignId) {
+    require(campaigns[_campaignId].creator == msg.sender, "Not campaign creator");
     _;
   }
 
-  modifier onlyValidProposal(uint256 _proposalId) {
-    require(_proposalId > 0 && _proposalId <= proposalCounter, "Proposal does not exist");
-    require(!proposals[_proposalId].isCancelled, "Proposal is cancelled");
+  modifier onlyValidCampaign(uint256 _campaignId) {
+    require(_campaignId > 0 && _campaignId <= campaignCounter, "Campaign does not exist");
+    require(!campaigns[_campaignId].isCancelled, "Campaign is cancelled");
     _;
   }
 
@@ -75,11 +77,11 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   }
 
   /*
-  * CREATE FUND RAISING PROPOSAL
+  * CREATE FUND RAISING CAMPAIGN
   * @params
   * string memory title, string memory description, string memory imageLink, uint256 goal, uint256 endDate, address preferredToken
   */
-  function createProposal(
+  function createCampaign(
     string memory title,
     string memory description,
     string memory imageLink,
@@ -98,176 +100,290 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     }
     require(size > 0, "Token address must be a contract");
 
-    proposalCounter++;
-    uint256 proposalId = proposalCounter;
+    campaignCounter++;
+    uint256 campaignId = campaignCounter;
 
-    Proposal storage newProposal = proposals[proposalId];
+    Campaign storage newCampaign = campaigns[campaignId];
 
-    newProposal.id = proposalId;
-    newProposal.title = title;
-    newProposal.description = description;
-    newProposal.imageLink = imageLink;
-    newProposal.goal = goal;
-    newProposal.endDate = endDate;
-    newProposal.creator = msg.sender;
-    newProposal.preferredToken = preferredToken;
-    newProposal.totalRaised = 0;
-    newProposal.isCancelled = false;
-    newProposal.isClaimed = false;
+    newCampaign.id = campaignId;
+    newCampaign.title = title;
+    newCampaign.description = description;
+    newCampaign.imageLink = imageLink;
+    newCampaign.goal = goal;
+    newCampaign.endDate = endDate;
+    newCampaign.createdAt = block.timestamp;
+    newCampaign.creator = msg.sender;
+    newCampaign.preferredToken = preferredToken;
+    newCampaign.totalRaised = 0;
+    newCampaign.isCancelled = false;
+    newCampaign.isClaimed = false;
 
-    userProposals[msg.sender].push(proposalId);
+    userCampaigns[msg.sender].push(campaignId);
 
-    emit ProposalCreated(proposalId, msg.sender, goal);
-    return proposalId;
+    emit CampaignCreated(campaignId, msg.sender, goal);
+    return campaignId;
   }
 
   /*
-  * CANCEL PROPOSAL
+  * CANCEL CAMPAIGN
   * @params
-  * uint256 _proposalId
+  * uint256 _campaignId
   */
-  function cancelProposal(uint256 _proposalId) external onlyValidProposal(_proposalId) whenNotPaused {
-    Proposal storage proposal = proposals[_proposalId];
-    require(msg.sender == proposal.creator || msg.sender == owner(), "Not authorized");
+  function cancelCampaign(uint256 _campaignId) external onlyValidCampaign(_campaignId) whenNotPaused {
+    Campaign storage campaign = campaigns[_campaignId];
+    require(msg.sender == campaign.creator || msg.sender == owner(), "Not authorized");
 
-    proposal.isCancelled = true;
-    emit ProposalCancelled(_proposalId);
+    campaign.isCancelled = true;
+    emit CampaignCancelled(_campaignId);
   }
 
   /*
-  * CONTRIBUTE TO PROPOSAL
+  * CONTRIBUTE TO CAMPAIGN
   * @params
-  * uint256 _proposalId, uint256 amount
+  * uint256 _campaignId, uint256 amount
   */
-  function contribute(uint256 _proposalId, uint256 amount) external onlyValidProposal(_proposalId) whenNotPaused {
+  function contribute(uint256 _campaignId, uint256 amount) external onlyValidCampaign(_campaignId) whenNotPaused {
     require(amount > 0, "Amount must be greater than 0");
-    Proposal storage proposal = proposals[_proposalId];
-    require(block.timestamp <= proposal.endDate, "Proposal has ended");
+    Campaign storage campaign = campaigns[_campaignId];
+    require(block.timestamp <= campaign.endDate, "Campaign has ended");
 
-    IERC20 token = IERC20(proposal.preferredToken);
+    IERC20 token = IERC20(campaign.preferredToken);
     require(token.transferFrom(msg.sender, address(this), amount), "Transfer failed");
 
-    proposal.totalRaised += amount;
-    proposal.contributions[msg.sender] += amount;
+    campaign.totalRaised += amount;
+    campaign.contributions[msg.sender] += amount;
 
-    proposalContributions[_proposalId].push(Contribution({
+    campaignContributions[_campaignId].push(Contribution({
       contributor: msg.sender,
       amount: amount,
       timestamp: block.timestamp
     }));
 
-    emit ContributionMade(_proposalId, msg.sender, amount);
+    emit ContributionMade(_campaignId, msg.sender, amount);
   }
 
   /*
   * CLAIM FUNDS RAISED
   * @params
-  * uint256 _proposalId
+  * uint256 _campaignId
   */
-  function claimFunds(uint256 _proposalId) external onlyValidProposal(_proposalId) onlyProposalCreator(_proposalId) whenNotPaused nonReentrant {
-    Proposal storage proposal = proposals[_proposalId];
-    require(!proposal.isClaimed, "Funds already claimed");
-    require(block.timestamp > proposal.endDate, "Proposal still active");
-    require(proposal.totalRaised >= proposal.goal, "Goal not reached");
+  function claimFunds(uint256 _campaignId) external onlyValidCampaign(_campaignId) onlyCampaignCreator(_campaignId) whenNotPaused nonReentrant {
+    Campaign storage campaign = campaigns[_campaignId];
+    require(!campaign.isClaimed, "Funds already claimed");
+    require(block.timestamp > campaign.endDate, "Campaign still active");
+    require(campaign.totalRaised >= campaign.goal, "Goal not reached");
 
-    uint256 feeAmount = (proposal.totalRaised * platformFee) / 10000;
-    uint256 creatorAmount = proposal.totalRaised - feeAmount;
+    uint256 feeAmount = (campaign.totalRaised * platformFee) / 10000;
+    uint256 creatorAmount = campaign.totalRaised - feeAmount;
 
-    proposal.isClaimed = true;
+    campaign.isClaimed = true;
 
-    IERC20 token = IERC20(proposal.preferredToken);
+    IERC20 token = IERC20(campaign.preferredToken);
     require(token.transfer(owner(), feeAmount), "Fee transfer failed");
-    require(token.transfer(proposal.creator, creatorAmount), "Creator transfer failed");
+    require(token.transfer(campaign.creator, creatorAmount), "Creator transfer failed");
 
-    emit FundsClaimed(_proposalId, creatorAmount);
+    emit FundsClaimed(_campaignId, creatorAmount);
   }
 
   /*
   * WITHDRAW CONTRIBUTED FUND
   * @params
-  * uint256 _proposalId
+  * uint256 _campaignId
   */
-  function withdrawContribution(uint256 _proposalId) external onlyValidProposal(_proposalId) whenNotPaused nonReentrant {
-    Proposal storage proposal = proposals[_proposalId];
-    uint256 contributedAmount = proposal.contributions[msg.sender];
+  function withdrawContribution(uint256 _campaignId) external whenNotPaused nonReentrant {
+    Campaign storage campaign = campaigns[_campaignId];
+    uint256 contributedAmount = campaign.contributions[msg.sender];
 
     require(contributedAmount > 0, "No contribution found");
-    require(
-      proposal.isCancelled ||
-      (block.timestamp > proposal.endDate && proposal.totalRaised < proposal.goal),
-      "Cannot withdraw"
-    );
+    require(campaign.isCancelled, "Campaign must be cancelled to withdraw");
 
-    proposal.totalRaised -= contributedAmount;
+    campaign.contributions[msg.sender] = 0;
+    campaign.totalRaised -= contributedAmount;
 
-    IERC20 token = IERC20(proposal.preferredToken);
+    IERC20 token = IERC20(campaign.preferredToken);
     require(token.transfer(msg.sender, contributedAmount), "Transfer failed");
 
-    emit ContributionWithdrawn(_proposalId, msg.sender, contributedAmount);
+    emit ContributionWithdrawn(_campaignId, msg.sender, contributedAmount);
   }
 
   /*
-  * GET PROPOSALS BY USER
+  * GET CAMPAIGNS BY USER
   * @params address userAddress
-  * returns all proposals by a user
+  * returns all campaigns by a user
   */
-  function getProposalsByUser(address userAddress) external view returns (uint256[] memory) {
-    return userProposals[userAddress];
+  function getCampaignsByUser(address userAddress) external view returns (CampaignWithContributions[] memory) {
+    uint256[] memory userCampaignIds = userCampaigns[userAddress];
+    CampaignWithContributions[] memory userCampaignsList = new CampaignWithContributions[](userCampaignIds.length);
+
+    for (uint256 i = 0; i < userCampaignIds.length; i++) {
+      Campaign storage currentCampaign = campaigns[userCampaignIds[i]];
+      Contribution[] memory currentContributions = campaignContributions[userCampaignIds[i]];
+
+      userCampaignsList[i] = CampaignWithContributions({
+        id: currentCampaign.id,
+        title: currentCampaign.title,
+        description: currentCampaign.description,
+        imageLink: currentCampaign.imageLink,
+        goal: currentCampaign.goal,
+        endDate: currentCampaign.endDate,
+        createdAt: currentCampaign.createdAt,
+        creator: currentCampaign.creator,
+        preferredToken: currentCampaign.preferredToken,
+        totalRaised: currentCampaign.totalRaised,
+        isCancelled: currentCampaign.isCancelled,
+        isClaimed: currentCampaign.isClaimed,
+        contributions: currentContributions
+      });
+    }
+
+    return userCampaignsList;
   }
 
   /*
-  * GET PROPOSAL DETAILS
-  * @params uint256 _proposalId
-  * returns details of a proposal with an array of objects containing all the contributions
+  * GET CAMPAIGN DETAILS
+  * @params uint256 _campaignId
+  * returns details of a campaign with an array of objects containing all the contributions
   */
-  function getProposalDetails(uint256 _proposalId) external view onlyValidProposal(_proposalId) returns (ProposalWithContributions memory) {
-    Proposal storage proposal = proposals[_proposalId];
-    Contribution[] memory contributions = proposalContributions[_proposalId];
+  function getCampaignDetails(uint256 _campaignId) external view returns (CampaignWithContributions memory) {
+    Campaign storage campaign = campaigns[_campaignId];
+    Contribution[] memory contributions = campaignContributions[_campaignId];
 
-    return ProposalWithContributions({
-      id: proposal.id,
-      title: proposal.title,
-      description: proposal.description,
-      imageLink: proposal.imageLink,
-      goal: proposal.goal,
-      endDate: proposal.endDate,
-      creator: proposal.creator,
-      preferredToken: proposal.preferredToken,
-      totalRaised: proposal.totalRaised,
-      isCancelled: proposal.isCancelled,
-      isClaimed: proposal.isClaimed,
+    return CampaignWithContributions({
+      id: campaign.id,
+      title: campaign.title,
+      description: campaign.description,
+      imageLink: campaign.imageLink,
+      goal: campaign.goal,
+      endDate: campaign.endDate,
+      createdAt: campaign.createdAt,
+      creator: campaign.creator,
+      preferredToken: campaign.preferredToken,
+      totalRaised: campaign.totalRaised,
+      isCancelled: campaign.isCancelled,
+      isClaimed: campaign.isClaimed,
       contributions: contributions
     });
   }
 
   /*
-  * GET ALL CREATED PROPOSALS
-  * returns an array of all proposals
+  * GET ALL CREATED CAMPAIGNS
+  * returns an array of all campaigns
   */
-  function getAllProposals() external view returns (ProposalWithContributions[] memory) {
-    ProposalWithContributions[] memory allProposals = new ProposalWithContributions[](proposalCounter);
+  function getAllCampaigns() external view returns (CampaignWithContributions[] memory) {
+    CampaignWithContributions[] memory allCampaigns = new CampaignWithContributions[](campaignCounter);
 
-    for (uint256 i = 1; i <= proposalCounter; i++) {
-      Proposal storage currentProposal = proposals[i];
-      Contribution[] memory currentContributions = proposalContributions[i];
+    for (uint256 i = 1; i <= campaignCounter; i++) {
+      Campaign storage currentCampaign = campaigns[i];
+      Contribution[] memory currentContributions = campaignContributions[i];
 
-      allProposals[i - 1] = ProposalWithContributions({
-        id: currentProposal.id,
-        title: currentProposal.title,
-        description: currentProposal.description,
-        imageLink: currentProposal.imageLink,
-        goal: currentProposal.goal,
-        endDate: currentProposal.endDate,
-        creator: currentProposal.creator,
-        preferredToken: currentProposal.preferredToken,
-        totalRaised: currentProposal.totalRaised,
-        isCancelled: currentProposal.isCancelled,
-        isClaimed: currentProposal.isClaimed,
+      allCampaigns[i - 1] = CampaignWithContributions({
+        id: currentCampaign.id,
+        title: currentCampaign.title,
+        description: currentCampaign.description,
+        imageLink: currentCampaign.imageLink,
+        goal: currentCampaign.goal,
+        endDate: currentCampaign.endDate,
+        createdAt: currentCampaign.createdAt,
+        creator: currentCampaign.creator,
+        preferredToken: currentCampaign.preferredToken,
+        totalRaised: currentCampaign.totalRaised,
+        isCancelled: currentCampaign.isCancelled,
+        isClaimed: currentCampaign.isClaimed,
         contributions: currentContributions
       });
     }
 
-    return allProposals;
+    return allCampaigns;
+  }
+
+  /*
+  * GET ALL ACTIVE CAMPAIGNS
+  * returns an array of all active campaigns
+  */
+  function getActiveCampaigns() external view returns (CampaignWithContributions[] memory) {
+    uint256 activeCount = 0;
+
+    // First, count active campaigns
+    for (uint256 i = 1; i <= campaignCounter; i++) {
+      if (!campaigns[i].isCancelled && block.timestamp <= campaigns[i].endDate) {
+        activeCount++;
+      }
+    }
+
+    CampaignWithContributions[] memory activeCampaigns = new CampaignWithContributions[](activeCount);
+    uint256 currentIndex = 0;
+
+    // Then populate the array
+    for (uint256 i = 1; i <= campaignCounter && currentIndex < activeCount; i++) {
+      if (!campaigns[i].isCancelled && block.timestamp <= campaigns[i].endDate) {
+        Campaign storage currentCampaign = campaigns[i];
+        Contribution[] memory currentContributions = campaignContributions[i];
+
+        activeCampaigns[currentIndex] = CampaignWithContributions({
+          id: currentCampaign.id,
+          title: currentCampaign.title,
+          description: currentCampaign.description,
+          imageLink: currentCampaign.imageLink,
+          goal: currentCampaign.goal,
+          endDate: currentCampaign.endDate,
+          createdAt: currentCampaign.createdAt,
+          creator: currentCampaign.creator,
+          preferredToken: currentCampaign.preferredToken,
+          totalRaised: currentCampaign.totalRaised,
+          isCancelled: currentCampaign.isCancelled,
+          isClaimed: currentCampaign.isClaimed,
+          contributions: currentContributions
+        });
+        currentIndex++;
+      }
+    }
+
+    return activeCampaigns;
+  }
+
+  /*
+  * GET ALL ENDED CAMPAIGNS
+  * returns an array of all ended campaigns
+  */
+  function getEndedCampaigns() external view returns (CampaignWithContributions[] memory) {
+    uint256 endedCount = 0;
+
+    // First, count ended campaigns
+    for (uint256 i = 1; i <= campaignCounter; i++) {
+      if (!campaigns[i].isCancelled && block.timestamp > campaigns[i].endDate) {
+        endedCount++;
+      }
+    }
+
+    CampaignWithContributions[] memory endedCampaigns = new CampaignWithContributions[](endedCount);
+    uint256 currentIndex = 0;
+
+    // Then populate the array
+    for (uint256 i = 1; i <= campaignCounter && currentIndex < endedCount; i++) {
+      if (!campaigns[i].isCancelled && block.timestamp > campaigns[i].endDate) {
+        Campaign storage currentCampaign = campaigns[i];
+        Contribution[] memory currentContributions = campaignContributions[i];
+
+        endedCampaigns[currentIndex] = CampaignWithContributions({
+          id: currentCampaign.id,
+          title: currentCampaign.title,
+          description: currentCampaign.description,
+          imageLink: currentCampaign.imageLink,
+          goal: currentCampaign.goal,
+          endDate: currentCampaign.endDate,
+          createdAt: currentCampaign.createdAt,
+          creator: currentCampaign.creator,
+          preferredToken: currentCampaign.preferredToken,
+          totalRaised: currentCampaign.totalRaised,
+          isCancelled: currentCampaign.isCancelled,
+          isClaimed: currentCampaign.isClaimed,
+          contributions: currentContributions
+        });
+        currentIndex++;
+      }
+    }
+
+    return endedCampaigns;
   }
 
   /* contract creator function
@@ -300,53 +416,12 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   */
   function getTotalFundsRaised() external view returns (uint256) {
     uint256 total = 0;
-    for (uint256 i = 1; i <= proposalCounter; i++) {
-      if (!proposals[i].isCancelled && proposals[i].totalRaised >= proposals[i].goal) {
-        total += proposals[i].totalRaised;
+    for (uint256 i = 1; i <= campaignCounter; i++) {
+      if (!campaigns[i].isCancelled && campaigns[i].totalRaised >= campaigns[i].goal) {
+        total += campaigns[i].totalRaised;
       }
     }
 
     return total;
-  }
-
-  /*
-  * GET NUMBER OF SUCCESSFUL PROPOSALS
-  * returns uint256
-  */
-  function getSuccessfulProposalsCount() external view returns (uint256) {
-    uint256 count = 0;
-    for (uint256 i = 1; i <= proposalCounter; i++) {
-      if (!proposals[i].isCancelled &&
-        proposals[i].totalRaised >= proposals[i].goal &&
-        block.timestamp > proposals[i].endDate) {
-        count++;
-      }
-    }
-
-    return count;
-  }
-
-  /*
-  * GET NUMBER OF ACTIVE PROPOSALS
-  * returns uint256
-  */
-  function getActiveProposalsCount() external view returns (uint256) {
-    uint256 count = 0;
-    for (uint256 i = 1; i <= proposalCounter; i++) {
-      if (!proposals[i].isCancelled &&
-        block.timestamp <= proposals[i].endDate) {
-        count++;
-      }
-    }
-
-    return count;
-  }
-
-  /*
-  * GET TOTAL AMOUNT USER CONTRIBUTED TO A PROPOSAL
-  * @params uint256 proposalId, address contributor
-  */
-  function getUserContribution(uint256 _proposalId, address contributor) external view onlyValidProposal(_proposalId) returns (uint256) {
-    return proposals[_proposalId].contributions[contributor];
   }
 }
