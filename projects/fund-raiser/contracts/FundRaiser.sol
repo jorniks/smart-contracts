@@ -106,7 +106,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     require(size > 0, "Token address must be a contract");
 
     uint8 decimals = getTokenDecimals(preferredToken);
-    uint256 adjustedGoal = goal * (10 ** decimals);  // Convert to token's decimal places
+    uint256 adjustedGoal = denormalizeAmount(goal, decimals);  // Convert to token's decimal places
 
     campaignCounter++;
     uint256 campaignId = campaignCounter;
@@ -142,6 +142,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     require(msg.sender == campaign.creator || msg.sender == owner(), "Not authorized");
 
     campaign.status = CampaignStatus.Cancelled;
+    campaign.endDate = block.timestamp;
 
     // Transfer back all contributions
     IERC20 token = IERC20(campaign.preferredToken);
@@ -177,6 +178,12 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
 
     campaign.totalRaised += amount;
     campaign.contributions[msg.sender] += amount;
+
+    // Check if goal is reached and update status
+    if (campaign.totalRaised >= campaign.goal && campaign.status == CampaignStatus.Active) {
+      campaign.status = CampaignStatus.Ended;
+      campaign.endDate = block.timestamp;
+    }
 
     campaignContributions[_campaignId].push(Contribution({
       contributor: msg.sender,
@@ -407,7 +414,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   * returns decimalized amount
   */
   function denormalizeAmount(uint256 amount, uint8 decimals) internal pure returns (uint256) {
-      return amount * (10 ** decimals);
+    return amount * (10 ** decimals);
   }
 
   /*
