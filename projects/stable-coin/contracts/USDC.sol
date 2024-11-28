@@ -63,6 +63,10 @@ contract USDC is ERC20, ERC20Permit, Ownable, Pausable {
     _minters[minter] = true;
   }
 
+  function isMinter(address account) public view returns (bool) {
+    return _minters[account];
+  }
+
   function removeMinter(address minter) public {
     _minters[minter] = false;
   }
@@ -76,7 +80,7 @@ contract USDC is ERC20, ERC20Permit, Ownable, Pausable {
     _blacklisted[account] = false;
   }
 
-  function isBlacklisted(address account) internal view returns (bool) {
+  function isBlacklisted(address account) public view returns (bool) {
     return _blacklisted[account];
   }
 
