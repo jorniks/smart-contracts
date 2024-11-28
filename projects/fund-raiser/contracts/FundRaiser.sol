@@ -140,9 +140,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   function cancelCampaign(uint256 _campaignId) external onlyValidCampaign(_campaignId) whenNotPaused {
     Campaign storage campaign = campaigns[_campaignId];
     require(msg.sender == campaign.creator || msg.sender == owner(), "Not authorized");
-
-    campaign.status = CampaignStatus.Cancelled;
-    campaign.endDate = block.timestamp;
+    require(campaign.status != CampaignStatus.Cancelled, "Campaign is already cancelled");
 
     // Transfer back all contributions
     IERC20 token = IERC20(campaign.preferredToken);
@@ -158,7 +156,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
       }
     }
 
-    campaign.totalRaised = 0;
+    campaign.status = CampaignStatus.Cancelled;
 
     emit CampaignCancelled(_campaignId);
   }
@@ -179,17 +177,16 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     campaign.totalRaised += amount;
     campaign.contributions[msg.sender] += amount;
 
-    // Check if goal is reached and update status
-    if (campaign.totalRaised >= campaign.goal && campaign.status == CampaignStatus.Active) {
-      campaign.status = CampaignStatus.Ended;
-      campaign.endDate = block.timestamp;
-    }
-
     campaignContributions[_campaignId].push(Contribution({
       contributor: msg.sender,
       amount: amount,
       timestamp: block.timestamp
     }));
+
+    // Check if goal is reached and update status
+    if (campaign.totalRaised >= campaign.goal && campaign.status == CampaignStatus.Active) {
+      campaign.status = CampaignStatus.Ended;
+    }
 
     emit ContributionMade(_campaignId, msg.sender, amount);
   }
@@ -201,17 +198,17 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   */
   function claimFunds(uint256 _campaignId) external onlyValidCampaign(_campaignId) onlyCampaignCreator(_campaignId) whenNotPaused nonReentrant {
     Campaign storage campaign = campaigns[_campaignId];
-    require(block.timestamp > campaign.endDate, "Campaign still active");
     require(campaign.totalRaised >= campaign.goal, "Goal not reached");
+    require(campaign.status != CampaignStatus.Claimed, "Campaign already claimed");
 
     uint256 feeAmount = (campaign.totalRaised * platformFee) / 10000;
     uint256 creatorAmount = campaign.totalRaised - feeAmount;
 
-    campaign.status = CampaignStatus.Claimed;
-
     IERC20 token = IERC20(campaign.preferredToken);
-    require(token.transfer(owner(), feeAmount), "Fee transfer failed");
     require(token.transfer(campaign.creator, creatorAmount), "Creator transfer failed");
+    require(token.transfer(owner(), feeAmount), "Fee transfer failed");
+
+    campaign.status = CampaignStatus.Claimed;
 
     emit FundsClaimed(_campaignId, creatorAmount);
   }
@@ -249,7 +246,6 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     for (uint256 i = 0; i < userCampaignIds.length; i++) {
       Campaign storage currentCampaign = campaigns[userCampaignIds[i]];
       Contribution[] memory currentContributions = campaignContributions[userCampaignIds[i]];
-      CampaignStatus currentStatus = _getCurrentStatus(currentCampaign);
 
       // Normalize amounts for UI
       uint256 normalizedGoal = normalizeAmount(currentCampaign.goal, currentCampaign.tokenDecimals);
@@ -276,7 +272,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
         preferredToken: currentCampaign.preferredToken,
         tokenDecimals: currentCampaign.tokenDecimals,
         totalRaised: normalizedTotalRaised,
-        status: currentStatus,
+        status: currentCampaign.status,
         contributions: normalizedContributions
       });
     }
@@ -292,7 +288,6 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   function getCampaignDetails(uint256 _campaignId) external view returns (CampaignWithContributions memory) {
     Campaign storage campaign = campaigns[_campaignId];
     Contribution[] memory contributions = campaignContributions[_campaignId];
-    CampaignStatus currentStatus = _getCurrentStatus(campaign);
 
     // Normalize amounts for UI
     uint256 normalizedGoal = normalizeAmount(campaign.goal, campaign.tokenDecimals);
@@ -319,7 +314,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
       preferredToken: campaign.preferredToken,
       tokenDecimals: campaign.tokenDecimals,
       totalRaised: normalizedTotalRaised,
-      status: currentStatus,
+      status: campaign.status,
       contributions: normalizedContributions
     });
   }
@@ -334,7 +329,6 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
     for (uint256 i = 1; i <= campaignCounter; i++) {
       Campaign storage currentCampaign = campaigns[i];
       Contribution[] memory currentContributions = campaignContributions[i];
-      CampaignStatus currentStatus = _getCurrentStatus(currentCampaign);
 
       // Normalize amounts for UI
       uint256 normalizedGoal = normalizeAmount(currentCampaign.goal, currentCampaign.tokenDecimals);
@@ -361,7 +355,7 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
         preferredToken: currentCampaign.preferredToken,
         tokenDecimals: currentCampaign.tokenDecimals,
         totalRaised: normalizedTotalRaised,
-        status: currentStatus,
+        status: currentCampaign.status,
         contributions: normalizedContributions
       });
     }
@@ -415,20 +409,5 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   */
   function denormalizeAmount(uint256 amount, uint8 decimals) internal pure returns (uint256) {
     return amount * (10 ** decimals);
-  }
-
-  /*
-  * HELPER FUNCTION TO GET CAMPAIGN STATUS
-  */
-  function _getCurrentStatus(Campaign storage campaign) internal view returns (CampaignStatus) {
-    if (campaign.status == CampaignStatus.Cancelled || campaign.status == CampaignStatus.Claimed) {
-      return campaign.status;
-    }
-
-    if (block.timestamp > campaign.endDate) {
-      return CampaignStatus.Ended;
-    }
-
-    return CampaignStatus.Active;
   }
 }
