@@ -6,7 +6,7 @@ import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Pausable.sol";
 
-contract StableCoin is ERC20, ERC20Permit, Ownable, Pausable {
+contract USDT is ERC20, ERC20Permit, Ownable, Pausable {
   // Minter role for authorized entities to create new tokens
   mapping(address => bool) private _minters;
 
@@ -14,7 +14,7 @@ contract StableCoin is ERC20, ERC20Permit, Ownable, Pausable {
   mapping(address => bool) private _blacklisted;
 
   // Constructor
-  constructor() ERC20("USDC", "USDC") Ownable(msg.sender) ERC20Permit("USDC") {
+  constructor() ERC20("USDT", "USDT") Ownable(msg.sender) ERC20Permit("USDT") {
     _mint(msg.sender, 10_000 * 10 ** decimals());
   }
 
@@ -49,7 +49,7 @@ contract StableCoin is ERC20, ERC20Permit, Ownable, Pausable {
     return super.transferFrom(sender, recipient, amount);
   }
 
-  // Stablecoin Specific Functions
+  // USDT Specific Functions
   function mint(address to, uint256 amount) public onlyMinter {
     _mint(to, amount);
   }
