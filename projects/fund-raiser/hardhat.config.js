@@ -3,31 +3,38 @@ require('dotenv').config();
 require('@nomicfoundation/hardhat-ethers');
 require("@nomicfoundation/hardhat-verify");
 
-const { DEPLOYING_WALLET_PRIVATE_KEY, LINEASCAN_API_KEY } = process.env;
+const {
+  DEPLOYING_WALLET_PRIVATE_KEY,
+  NETWORKSCAN_API_KEY,
+  RPC_URL,
+  NETWORK_EXPLORER_URL,
+  NETWORK_API_URL,
+  CHAIN_ID,
+} = process.env;
 
 module.exports = {
   solidity: "0.8.27",
-  defaultNetwork: "lineaSepolia",
+  defaultNetwork: NETWORK_NAME,
   sourcify: {
     enabled: true,
   },
   networks: {
     hardhat: {},
     lineaSepolia: {
-      url: "https://rpc.sepolia.linea.build",
-      chainId: 59141,
+      url: RPC_URL,
+      chainId: Number(CHAIN_ID),
       accounts: [DEPLOYING_WALLET_PRIVATE_KEY],
     },
   },
   etherscan: {
-    apiKey: LINEASCAN_API_KEY,
+    apiKey: NETWORKSCAN_API_KEY,
     customChains: [
       {
-        network: "linea_sepolia",
-        chainId: 59141,
+        network: NETWORK_NAME,
+        chainId: Number(CHAIN_ID),
         urls: {
-          apiURL: "https://api-sepolia.lineascan.build/api",
-          browserURL: "https://sepolia.lineascan.build",
+          apiURL: NETWORK_API_URL,
+          browserURL: NETWORK_EXPLORER_URL,
         },
       },
     ],
