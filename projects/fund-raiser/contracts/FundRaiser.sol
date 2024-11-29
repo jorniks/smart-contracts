@@ -198,7 +198,11 @@ contract FundRaiser is Pausable, Ownable, ReentrancyGuard {
   */
   function claimFunds(uint256 _campaignId) external onlyValidCampaign(_campaignId) onlyCampaignCreator(_campaignId) whenNotPaused nonReentrant {
     Campaign storage campaign = campaigns[_campaignId];
-    require(campaign.totalRaised >= campaign.goal, "Goal not reached");
+    require(
+      (campaign.totalRaised >= campaign.goal && block.timestamp <= campaign.endDate) ||
+      block.timestamp > campaign.endDate,
+      "Cannot claim funds yet"
+    );
     require(campaign.status != CampaignStatus.Claimed, "Campaign already claimed");
 
     uint256 feeAmount = (campaign.totalRaised * platformFee) / 10000;
