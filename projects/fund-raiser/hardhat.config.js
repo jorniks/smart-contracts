@@ -10,6 +10,7 @@ const {
   NETWORK_EXPLORER_URL,
   NETWORK_API_URL,
   CHAIN_ID,
+  NETWORK_NAME
 } = process.env;
 
 module.exports = {
@@ -20,7 +21,7 @@ module.exports = {
   },
   networks: {
     hardhat: {},
-    lineaSepolia: {
+    [NETWORK_NAME]: {
       url: RPC_URL,
       chainId: Number(CHAIN_ID),
       accounts: [DEPLOYING_WALLET_PRIVATE_KEY],
