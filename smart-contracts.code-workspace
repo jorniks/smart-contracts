@@ -17,6 +17,24 @@
 			"path": "./projects/databank"
 		},
 		{
+			"path": "./projects/devault - neo"
+		},
+		{
+			"path": "./projects/skill-market"
+		},
+		{
+			"path": "./projects/dine-rate"
+		},
+		{
+			"path": "./projects/yard-sale"
+		},
+		{
+			"path": "./projects/eventura"
+		},
+		{
+			"path": "./projects/hashsend"
+		},
+		{
 			"path": "."
 		},
 	],
